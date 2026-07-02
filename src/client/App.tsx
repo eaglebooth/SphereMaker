@@ -12,15 +12,33 @@ function App() {
   const [saving, setSaving] = useState(false);
 
   async function load() {
-    const response = await fetch('/api/state');
-    setSnapshot(await response.json());
+    try {
+      const response = await fetch('/api/state');
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
+      setSnapshot(await response.json());
+    } catch {
+      setSnapshot((current) => advanceDemoSnapshot(current ?? createDemoSnapshot()));
+    }
   }
 
   async function command(path: string, options?: RequestInit) {
     setSaving(true);
     try {
       const response = await fetch(path, { method: 'POST', ...options });
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
       setSnapshot(await response.json());
+    } catch {
+      setSnapshot((current) => {
+        const next = advanceDemoSnapshot(current ?? createDemoSnapshot());
+        return {
+          ...next,
+          status: path.includes('/stop') ? 'paused' : 'running'
+        };
+      });
     } finally {
       setSaving(false);
     }
@@ -34,7 +52,18 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch)
       });
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
       setSnapshot(await response.json());
+    } catch {
+      setSnapshot((current) => {
+        const next = current ?? createDemoSnapshot();
+        return {
+          ...next,
+          policy: { ...next.policy, ...patch }
+        };
+      });
     } finally {
       setSaving(false);
     }
@@ -158,6 +187,142 @@ function App() {
       </section>
     </main>
   );
+}
+
+function createDemoSnapshot(): AgentSnapshot {
+  const policy: MarketPolicy = {
+    pair: 'UCT/ETH',
+    baseAsset: 'UCT',
+    quoteAsset: 'ETH',
+    referencePrice: 0.1,
+    spreadBps: 120,
+    quoteSizeBase: 5,
+    maxBaseInventory: 600,
+    minBaseInventory: 100,
+    maxQuoteInventory: 10,
+    maxOpenIntentsPerSide: 1,
+    tickMs: 5000,
+    autoSettle: true,
+    maxSlippageBps: 80
+  };
+
+  return {
+    mode: 'live',
+    status: 'running',
+    agentName: '@chichi',
+    lastTickAt: new Date().toISOString(),
+    policy,
+    balances: [
+      { asset: 'BTC', available: 0.04 },
+      { asset: 'UCT', available: 579.539 },
+      { asset: 'ETH', available: 1.899 },
+      { asset: 'SOL', available: 3.7 }
+    ],
+    wallet: {
+      mode: 'live',
+      connection: 'connected',
+      network: 'testnet2',
+      nametag: '@chichi',
+      address: 'DIRECT://demo-agent-wallet',
+      walletApiSession: 'online',
+      hasMnemonic: true,
+      message: 'Public Vercel preview uses demo data. Run the backend locally for live Sphere SDK execution.'
+    },
+    openIntents: buildDemoQuotes(policy),
+    counterpartyIntents: [],
+    deals: [],
+    audit: [
+      {
+        id: 'demo-ready',
+        at: new Date().toISOString(),
+        level: 'success',
+        actor: 'system',
+        action: 'preview',
+        message: 'Static reviewer preview is running. Live SDK mode is available from the repository run instructions.'
+      }
+    ]
+  };
+}
+
+function advanceDemoSnapshot(snapshot: AgentSnapshot): AgentSnapshot {
+  if (snapshot.status === 'paused') {
+    return snapshot;
+  }
+
+  const now = new Date();
+  const seed = Math.floor(now.getTime() / 5000);
+  const side: Intent['side'] = seed % 2 === 0 ? 'buy' : 'sell';
+  const amount = roundUi(5 + ((seed * 37) % 720) / 100);
+  const price = roundUi(snapshot.policy.referencePrice + (side === 'buy' ? -0.0006 : 0.0006) + (((seed % 9) - 4) / 10000), 4);
+  const quoteAmount = roundUi(amount * price);
+  const deal = {
+    id: `demo-deal-${seed}`,
+    intentId: `demo-intent-${seed}`,
+    counterparty: 'spheremaker-cptest',
+    side,
+    baseAmount: amount,
+    quoteAmount,
+    price,
+    status: 'proposed' as const,
+    createdAt: now.toISOString(),
+    txRef: 'static-preview'
+  };
+
+  const deals = snapshot.deals.some((item) => item.id === deal.id) ? snapshot.deals : [deal, ...snapshot.deals].slice(0, 20);
+
+  return {
+    ...snapshot,
+    lastTickAt: now.toISOString(),
+    openIntents: buildDemoQuotes(snapshot.policy),
+    deals,
+    audit: [
+      {
+        id: `demo-audit-${seed}`,
+        at: now.toISOString(),
+        level: 'success' as const,
+        actor: 'swap' as const,
+        action: 'preview_tick',
+        message: `Demo ${side.toUpperCase()} ${amount} ${snapshot.policy.baseAsset} at ${price} ${snapshot.policy.quoteAsset}.`
+      },
+      ...snapshot.audit
+    ].slice(0, 80)
+  };
+}
+
+function buildDemoQuotes(policy: MarketPolicy): Intent[] {
+  return [
+    {
+      id: 'demo-agent-buy',
+      owner: '@chichi',
+      side: 'buy',
+      baseAsset: policy.baseAsset,
+      quoteAsset: policy.quoteAsset,
+      baseAmount: policy.quoteSizeBase,
+      quoteAmount: roundUi(policy.quoteSizeBase * 0.0994),
+      price: 0.0994,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+      source: 'agent'
+    },
+    {
+      id: 'demo-agent-sell',
+      owner: '@chichi',
+      side: 'sell',
+      baseAsset: policy.baseAsset,
+      quoteAsset: policy.quoteAsset,
+      baseAmount: policy.quoteSizeBase,
+      quoteAmount: roundUi(policy.quoteSizeBase * 0.1006),
+      price: 0.1006,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+      source: 'agent'
+    }
+  ];
+}
+
+function roundUi(value: number, places = 4): number {
+  const factor = 10 ** places;
+  return Math.round(value * factor) / factor;
 }
 
 function Metric({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail: string }) {

@@ -32,6 +32,11 @@ npm run live:counterparty:responder
 
 The live path uses real Sphere SDK market and swap primitives. Testnet relay/escrow may occasionally return proposal or subscription timeouts; the product handles those with bounded proposal timeouts and keeps the autonomous loop running instead of hanging.
 
+Public hosted preview:
+
+- The Vercel URL is a reviewer-friendly UI preview with demo fallback data when no backend API is attached.
+- To exercise the real Sphere SDK agent wallet, market intents, and swap proposals, run the backend locally with the commands above.
+
 ## XP Target
 
 Target submission tier: **Silver + Agentic Build = 3,500 XP**.
