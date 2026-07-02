@@ -37,14 +37,11 @@ Public hosted preview:
 - The Vercel URL is a reviewer-friendly UI preview with demo fallback data when no backend API is attached.
 - To exercise the real Sphere SDK agent wallet, market intents, and swap proposals, run the backend locally with the commands above.
 
-## XP Target
+## Current Limitations
 
-Target submission tier: **Silver + Agentic Build = 3,500 XP**.
+The agent can publish live market intents and propose swaps through the Sphere SDK. Full end-to-end settlement may be intermittent on Testnet v2 because the relay/escrow services can return proposal, subscription, or pending-swap-limit timeouts during review.
 
-- Silver: working original build using Sphere SDK primitives for a clear market-making use case.
-- Agentic bonus: the backend agent autonomously publishes intents, evaluates market opportunities, proposes swaps, and continues as a service loop.
-
-Gold direction is documented, but this submission intentionally prioritizes a stable reviewer demo over risky escrow-specific changes while Testnet v2 settlement endpoints are intermittently timing out.
+Sphere Maker handles those network conditions with bounded proposal timeouts, visible settlement status, and audit logs so the autonomous loop continues running instead of hanging.
 
 ## Why This Is Agentic
 
