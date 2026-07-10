@@ -1,0 +1,10 @@
+SphereTaskMarket/
+node_modules/
+logs/
+.sphere-data/
+sphere-data/
+.agents/
+submission-assets/
+docs/SUBMISSION_CHECKLIST.md
+*.log
+.env
